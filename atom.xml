@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+    <title>Paddling towards the Mariana Trench</title>
+    <subtitle>A blog dedicated to fiddling around with tech</subtitle>
+    <link href="https://d34db4b3.github.io/atom.xml" rel="self" type="application/atom+xml"/>
+    <link href="https://d34db4b3.github.io/"/>
+    <generator uri="https://www.getzola.org/">Zola</generator>
+    <updated>2023-06-11T19:14:38+00:00</updated>
+    <id>https://d34db4b3.github.io/atom.xml</id>
+    <entry xml:lang="en">
+        <title>A modern REST web service, written in Rust, Part I</title>
+        <published>2022-03-06T23:51:21+00:00</published>
+        <updated>2023-06-11T19:14:38+00:00</updated>
+        <author>
+          <name>d34db4b3</name>
+        </author>
+        <link rel="alternate" href="https://d34db4b3.github.io/posts/rust-rest-api-i/" type="text/html"/>
+        <id>https://d34db4b3.github.io/posts/rust-rest-api-i/</id>
+        
+        <content type="html">&lt;h1 id=&quot;tldr&quot;&gt;TLDR&lt;&#x2F;h1&gt;
+&lt;blockquote&gt;
+&lt;p&gt;We setup our project with &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&quot;&gt;&lt;code&gt;axum&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; and &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;tokio&#x2F;1&#x2F;tokio&quot;&gt;&lt;code&gt;tokio&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; and test it with a simple “greetings” endpoint.&lt;&#x2F;p&gt;
+&lt;&#x2F;blockquote&gt;
+&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;&#x2F;h1&gt;
+&lt;p&gt;The idea of this project is to implement a simple REST API using a number of common features. It will be split in several parts in order to focus on each aspect.&lt;&#x2F;p&gt;
+&lt;p&gt;Among them, we will first see the setting up of the web server, the routes registration and the management of requests and responses. We will then see the various challenges of proper logging, access restriction, internationalization and database management.&lt;&#x2F;p&gt;
+&lt;p&gt;We will use the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;www.rust-lang.org&#x2F;&quot;&gt;Rust&lt;&#x2F;a&gt; language, the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;github.com&#x2F;tokio-rs&#x2F;axum&quot;&gt;axum&lt;&#x2F;a&gt; framework to manage most of the HTTP server functionalities of our API and various other libraries (crates) detailed later. The particularities and the syntax of this language will not be discussed here.&lt;&#x2F;p&gt;
+&lt;p&gt;Provided commands will assume a linux host.&lt;&#x2F;p&gt;
+&lt;p&gt;Rust version &lt;code&gt;1.70.0&lt;&#x2F;code&gt; will be used and it is assumed that the build tools are installed beforehand (&lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;www.rust-lang.org&#x2F;tools&#x2F;install&quot;&gt;Rust installation&lt;&#x2F;a&gt;).&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;code.visualstudio.com&#x2F;&quot;&gt;Visual Studio Code&lt;&#x2F;a&gt; will be used as an IDE throughout the project.&lt;&#x2F;p&gt;
+&lt;p&gt;In order to debug and test our API, the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;hoppscotch.io&#x2F;&quot;&gt;HOPPSCOTCH&lt;&#x2F;a&gt; software can be used. The collection files will be provided for easier testing.&lt;&#x2F;p&gt;
+&lt;p&gt;For beginners in Rust, a tutorial will be available soon on this blog. In the meantime, it is recommended to read the excellent &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;doc.rust-lang.org&#x2F;book&#x2F;&quot;&gt;Rust book&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;The particularities of serialization&#x2F;deserialization via &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;serde.rs&#x2F;&quot;&gt;serde&lt;&#x2F;a&gt; will not be studied in detail in this article.&lt;&#x2F;p&gt;
+&lt;p&gt;During the course of the article, snapshots of the example project will be available and will consist of branches from the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;github.com&#x2F;d34db4b3&#x2F;rest-api-tutorial&quot;&gt;d34db4b3&#x2F;rest-api-tutorial&lt;&#x2F;a&gt; repository.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;project-initialization&quot;&gt;Project initialization&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;project-creation&quot;&gt;Project creation&lt;&#x2F;h2&gt;
+&lt;p&gt;As for any Rust project, we will use the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;doc.rust-lang.org&#x2F;cargo&#x2F;index.html&quot;&gt;cargo&lt;&#x2F;a&gt; utility to initialize the sources structure. Once placed in the folder where the project will be created, the following command will generate the &lt;code&gt;rest-api-tutorial&lt;&#x2F;code&gt; project.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;sh&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-sh &quot;&gt;&lt;code class=&quot;language-sh&quot; data-lang=&quot;sh&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span&gt; new rest-api-tutorial
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The newly created folder can then be opened in Visual Studio Code.&lt;&#x2F;p&gt;
+&lt;p&gt;The two files we are interested in are &lt;code&gt;Cargo.toml&lt;&#x2F;code&gt; and &lt;code&gt;src&#x2F;main.rs&lt;&#x2F;code&gt; which are respectively the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;doc.rust-lang.org&#x2F;cargo&#x2F;reference&#x2F;manifest.html&quot;&gt;application manifest&lt;&#x2F;a&gt; and the entry point of the program.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# Cargo.toml
+&lt;&#x2F;span&gt;&lt;span&gt;[package]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;rest-api-tutorial&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.1.0&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;edition &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;2021&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;[dependencies]
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;pre data-lang=&quot;rs&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rs &quot;&gt;&lt;code class=&quot;language-rs&quot; data-lang=&quot;rs&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; src&#x2F;main.rs
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;main&lt;&#x2F;span&gt;&lt;span&gt;() {
+&lt;&#x2F;span&gt;&lt;span&gt;    println!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hello, world!&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;);
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;It is now possible to compile and run the program with the following command from the project directory.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;sh&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-sh &quot;&gt;&lt;code class=&quot;language-sh&quot; data-lang=&quot;sh&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span&gt; run
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;A beautiful “Hello, world!” is presented to us, but it is not really the subject of this article.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;adding-crates&quot;&gt;Adding crates&lt;&#x2F;h2&gt;
+&lt;p&gt;We will need a few dependencies, notably &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&quot;&gt;&lt;code&gt;axum&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; and &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;tokio&#x2F;1&#x2F;tokio&quot;&gt;&lt;code&gt;tokio&lt;&#x2F;code&gt;&lt;&#x2F;a&gt;. Axum will provide most of the features required for an HTTP server (routing, HTTP protocol implementation, middlewares, etc.). As it takes advantages of the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;rust-lang.github.io&#x2F;async-book&#x2F;&quot;&gt;&lt;code&gt;async&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; Rust features, we will also need &lt;code&gt;tokio&lt;&#x2F;code&gt;, which is a runtime for asynchronous applications.&lt;&#x2F;p&gt;
+&lt;p&gt;Let’s add those in the &lt;code&gt;Cargo.toml&lt;&#x2F;code&gt; manifest file.
+To do this, insert the lines &lt;code&gt;axum = &amp;quot;0.6&amp;quot;&lt;&#x2F;code&gt; and &lt;code&gt;tokio = { version = &amp;quot;1&amp;quot;, features = [&amp;quot;full&amp;quot;] }&lt;&#x2F;code&gt; to the category &lt;code&gt;[dependencies]&lt;&#x2F;code&gt;. The file then looks like&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# Cargo.toml
+&lt;&#x2F;span&gt;&lt;span&gt;[package]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;rest-api-tutorial&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.1.0&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;edition &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;2021&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;[dependencies]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;axum &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.6&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;tokio &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;full&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;] }
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The “0.6” represents the version of &lt;code&gt;axum&lt;&#x2F;code&gt; to use. For more details on dependencies and the manifest file, see &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;doc.rust-lang.org&#x2F;cargo&#x2F;reference&#x2F;manifest.html&quot;&gt;this page&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;Dependencies can also (and probably should for simplicity sake) be added using&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;sh&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-sh &quot;&gt;&lt;code class=&quot;language-sh&quot; data-lang=&quot;sh&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span&gt; add axum@0.6
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span&gt; add tokio@1&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -F&lt;&#x2F;span&gt;&lt;span&gt; full
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h2 id=&quot;test-program&quot;&gt;Test program&lt;&#x2F;h2&gt;
+&lt;p&gt;In order to check the correct configuration of the manifest and to start our adventure with &lt;code&gt;axum&lt;&#x2F;code&gt;, the following program can be injected into the &lt;code&gt;src&#x2F;main.rs&lt;&#x2F;code&gt; file instead of the starting “helloworld”. Our file looks like this &lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rs&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rs &quot;&gt;&lt;code class=&quot;language-rs&quot; data-lang=&quot;rs&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;axum::{routing::get, Router};
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;std::net::SocketAddr;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;tokio&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;main&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span&gt;async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;main&lt;&#x2F;span&gt;&lt;span&gt;() {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; register a &amp;quot;helloworld&amp;quot; handler to the `&#x2F;` route
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; app = Router::new().&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;route&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;get&lt;&#x2F;span&gt;&lt;span&gt;(|| async { &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hello, World!&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; }));
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; addr = SocketAddr::from(([&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;127&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3000&lt;&#x2F;span&gt;&lt;span&gt;));
+&lt;&#x2F;span&gt;&lt;span&gt;    println!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;listening on http:&#x2F;&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;{}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, addr);
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; start the HTTP server and serve our newly created service
+&lt;&#x2F;span&gt;&lt;span&gt;    axum::Server::bind(&amp;amp;addr)
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;serve&lt;&#x2F;span&gt;&lt;span&gt;(app.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;into_make_service&lt;&#x2F;span&gt;&lt;span&gt;())
+&lt;&#x2F;span&gt;&lt;span&gt;        .await
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This program resembles the structure of the previous program with its &lt;code&gt;main&lt;&#x2F;code&gt; function, but there are some new keywords such as &lt;code&gt;async&lt;&#x2F;code&gt; and &lt;code&gt;await&lt;&#x2F;code&gt;. These describe the asynchronous operation of &lt;code&gt;axum&lt;&#x2F;code&gt; and we will come back to these details later. For now we will focus on the behavior of the application.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;application&quot;&gt;Application&lt;&#x2F;h3&gt;
+&lt;p&gt;In order for the server to do its job, we need to describe how it should work. This is the role of the &lt;code&gt;Router&lt;&#x2F;code&gt;, on which we will define routes, services and what it will need to do its job. Here, we ask it to register a &lt;code&gt;&#x2F;&lt;&#x2F;code&gt; route (&lt;code&gt;.route(&amp;quot;&#x2F;&amp;quot;, ...)&lt;&#x2F;code&gt;) on which a function will be grafted that will respond to the HTTP &lt;code&gt;GET&lt;&#x2F;code&gt; method (&lt;code&gt;get(...)&lt;&#x2F;code&gt;). This function described by a lambda (&lt;code&gt;|| async { &amp;quot;Hello, World!&amp;quot; }&lt;&#x2F;code&gt;) will simply return the string &lt;code&gt;&amp;quot;Hello, world!&amp;quot;&lt;&#x2F;code&gt;. A lambda is an unnamed function, used here to limit the size of the code and the amount of information present for the sake of clarity.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;http-server&quot;&gt;Http server&lt;&#x2F;h3&gt;
+&lt;p&gt;Then, we will need to serve our app with an HTTP server. An &lt;code&gt;axum::Server&lt;&#x2F;code&gt; is bound to the network interface and will listen on the TCP port &lt;code&gt;3000&lt;&#x2F;code&gt; (&lt;code&gt;::bind(&amp;amp;addr)&lt;&#x2F;code&gt;). We provide the &lt;code&gt;app&lt;&#x2F;code&gt; for the server to serve. The &lt;code&gt;.await&lt;&#x2F;code&gt; will finally let &lt;code&gt;tokio&lt;&#x2F;code&gt; “manage” the lifecycle of our app.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;running-the-program&quot;&gt;Running the program&lt;&#x2F;h2&gt;
+&lt;p&gt;To facilitate development, the &lt;code&gt;cargo-watch&lt;&#x2F;code&gt; utility will be used throughout this article. This utility allows an automatic recompilation at each change of the source code. To install it, just do&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;sh&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-sh &quot;&gt;&lt;code class=&quot;language-sh&quot; data-lang=&quot;sh&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span&gt; install cargo-watch
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Then the compilation process starts via&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;sh&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-sh &quot;&gt;&lt;code class=&quot;language-sh&quot; data-lang=&quot;sh&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span&gt; watch&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -x&lt;&#x2F;span&gt;&lt;span&gt; run
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This will re-run the &lt;code&gt;cargo run&lt;&#x2F;code&gt; command every time the source code changes.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;checking-the-behavior&quot;&gt;Checking the behavior&lt;&#x2F;h3&gt;
+&lt;p&gt;The expected operation of the program is an HTTP server listening on port &lt;code&gt;3000&lt;&#x2F;code&gt; and responding on route &lt;code&gt;&#x2F;&lt;&#x2F;code&gt; with the message &lt;code&gt;&amp;quot;Hello, world!&amp;quot;&lt;&#x2F;code&gt;. Using a browser such as Firefox, a request to the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;&quot;&gt;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;&lt;&#x2F;a&gt; page should display the message&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;Hello, world!
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;github.com&#x2F;d34db4b3&#x2F;rest-api-tutorial&#x2F;tree&#x2F;snapshots&#x2F;init&quot;&gt;Source code snapshot&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;analysis-of-a-handler&quot;&gt;Analysis of a handler&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;routing&quot;&gt;Routing&lt;&#x2F;h2&gt;
+&lt;p&gt;Each route is associated with a function to process the request and respond appropriately. These functions called &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;handler&#x2F;index.html&quot;&gt;handlers&lt;&#x2F;a&gt; are simply asynchronous functions that are given extractors as arguments (see &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;extract&#x2F;index.html&quot;&gt;&lt;code&gt;axum::extract&lt;&#x2F;code&gt;&lt;&#x2F;a&gt;) and return an object that must be convertible into a response (see &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;response&#x2F;index.html&quot;&gt;&lt;code&gt;axum::response&lt;&#x2F;code&gt;&lt;&#x2F;a&gt;).&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;request-analysis&quot;&gt;Request analysis&lt;&#x2F;h2&gt;
+&lt;p&gt;Most of the request data is obtained via “extractors” (a type implementing the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;extract&#x2F;trait.FromRequest.html&quot;&gt;&lt;code&gt;FromRequest&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; or &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;extract&#x2F;trait.FromRequestParts.html&quot;&gt;&lt;code&gt;FromRequestParts&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; trait). Several extractors are provided by &lt;code&gt;axum&lt;&#x2F;code&gt; in order to ease the implementation, but it is possible to add more as needed (which we will see with access restrictions in a next part). Among them we can mention &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;extract&#x2F;struct.Path.html&quot;&gt;&lt;code&gt;Path&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; allowing the extraction of parameters in the path of the resource, &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;extract&#x2F;struct.Query.html&quot;&gt;&lt;code&gt;Query&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; which in the same way allows the extraction of the parameters of the request (&lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;developer.mozilla.org&#x2F;en-US&#x2F;docs&#x2F;Learn&#x2F;Common_questions&#x2F;Web_mechanics&#x2F;What_is_a_URL&quot;&gt;more information on URLs&lt;&#x2F;a&gt;), &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;struct.Json.html&quot;&gt;&lt;code&gt;Json&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; which allows the deserialization of the request body from the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;www.json.org&#x2F;json-en.html&quot;&gt;JSON&lt;&#x2F;a&gt; format and finally &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;struct.Form.html&quot;&gt;&lt;code&gt;Form&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; which has a similar behavior from the classic URL-encoded form format.&lt;&#x2F;p&gt;
+&lt;p&gt;These extractors are given as parameters to our handlers and allow us to obtain data extraction with static and safe typing. The deserialization errors can thus be properly managed and it will be possible to have some guarantee over the presence and correctness of parameters before the processing of the request. This allows the code to be more robust, clear and concise.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;response-analysis&quot;&gt;Response analysis&lt;&#x2F;h2&gt;
+&lt;p&gt;In order to respond to requests, functions associated with routes must return an object that implements &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;response&#x2F;trait.IntoResponse.html&quot;&gt;&lt;code&gt;IntoResponse&lt;&#x2F;code&gt;&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;axum&lt;&#x2F;code&gt; provides for example the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;axum&#x2F;0.6&#x2F;axum&#x2F;struct.Json.html&quot;&gt;&lt;code&gt;Json&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; type which allows to transform any serializable object into a response.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;example&quot;&gt;Example&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;implementation&quot;&gt;Implementation&lt;&#x2F;h3&gt;
+&lt;p&gt;In order to illustrate the different elements mentioned earlier, we will imagine a &lt;code&gt;&#x2F;greet&lt;&#x2F;code&gt; route which via the &lt;code&gt;GET&lt;&#x2F;code&gt; method accepts as request parameters a name &lt;code&gt;name&lt;&#x2F;code&gt; and will return a JSON object containing a &lt;code&gt;greeting&lt;&#x2F;code&gt; message which will contain the formatted string &lt;code&gt;&amp;quot;Hello, {}!&amp;quot;&lt;&#x2F;code&gt; with the &lt;code&gt;name&lt;&#x2F;code&gt; present as parameter.&lt;&#x2F;p&gt;
+&lt;p&gt;We will therefore first define our parameters and response types, implementing respectively deserialization and serialization.&lt;&#x2F;p&gt;
+&lt;p&gt;We need te bring the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;serde.rs&#x2F;&quot;&gt;&lt;code&gt;serde&lt;&#x2F;code&gt;&lt;&#x2F;a&gt; framework.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;sh&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-sh &quot;&gt;&lt;code class=&quot;language-sh&quot; data-lang=&quot;sh&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;cargo&lt;&#x2F;span&gt;&lt;span&gt; add serde@1.0&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -F&lt;&#x2F;span&gt;&lt;span&gt; derive
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The code looks like this&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rs&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rs &quot;&gt;&lt;code class=&quot;language-rs&quot; data-lang=&quot;rs&quot;&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Deserialize)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;struct &lt;&#x2F;span&gt;&lt;span&gt;GreetQuery {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span&gt;: String,
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Serialize)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;struct &lt;&#x2F;span&gt;&lt;span&gt;GreetResponse {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;greeting&lt;&#x2F;span&gt;&lt;span&gt;: String,
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The &lt;code&gt;GreetQuery&lt;&#x2F;code&gt; type describes an object with a &lt;code&gt;name&lt;&#x2F;code&gt; field of type &lt;code&gt;String&lt;&#x2F;code&gt;. The &lt;code&gt;GreetResponse&lt;&#x2F;code&gt; type describes an object with a &lt;code&gt;greeting&lt;&#x2F;code&gt; field of type &lt;code&gt;String&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;We use the &lt;code&gt;Query&lt;&#x2F;code&gt; extractor on the &lt;code&gt;GreetQuery&lt;&#x2F;code&gt; type and the &lt;code&gt;Json&lt;&#x2F;code&gt; wrapper on the &lt;code&gt;GreetResponse&lt;&#x2F;code&gt; type. The handler thus looks like &lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rs&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rs &quot;&gt;&lt;code class=&quot;language-rs&quot; data-lang=&quot;rs&quot;&gt;&lt;span&gt;async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;greet&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;greet_query&lt;&#x2F;span&gt;&lt;span&gt;: Query&amp;lt;GreetQuery&amp;gt;) -&amp;gt; Json&amp;lt;GreetResponse&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;    Json(GreetResponse {
+&lt;&#x2F;span&gt;&lt;span&gt;        greeting: format!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hello, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;{}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;!&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, greet_query.name),
+&lt;&#x2F;span&gt;&lt;span&gt;    })
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Then we just need to register the route on our application and our &lt;code&gt;main&lt;&#x2F;code&gt; function now looks like&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rs&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rs &quot;&gt;&lt;code class=&quot;language-rs&quot; data-lang=&quot;rs&quot;&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;tokio&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;main&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span&gt;async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;main&lt;&#x2F;span&gt;&lt;span&gt;() {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; register our &amp;quot;greeting&amp;quot; handler to the `&#x2F;greet` route
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; app = Router::new().&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;route&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;greet&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;get&lt;&#x2F;span&gt;&lt;span&gt;(greet));
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; addr = SocketAddr::from(([&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;127&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3000&lt;&#x2F;span&gt;&lt;span&gt;));
+&lt;&#x2F;span&gt;&lt;span&gt;    println!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;listening on http:&#x2F;&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;{}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, addr);
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; start the HTTP server and serve our newly created service
+&lt;&#x2F;span&gt;&lt;span&gt;    axum::Server::bind(&amp;amp;addr)
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;serve&lt;&#x2F;span&gt;&lt;span&gt;(app.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;into_make_service&lt;&#x2F;span&gt;&lt;span&gt;())
+&lt;&#x2F;span&gt;&lt;span&gt;        .await
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h3 id=&quot;service-test&quot;&gt;Service test&lt;&#x2F;h3&gt;
+&lt;p&gt;The &lt;code&gt;&#x2F;greet&lt;&#x2F;code&gt; route should therefore respond with a nice message in the form of a JSON document.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;valid-test&quot;&gt;Valid test&lt;&#x2F;h4&gt;
+&lt;p&gt;A query on the &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;greet?name=John%20Doe&quot;&gt;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;greet?name=John%20Doe&lt;&#x2F;a&gt; resource should show us the following response:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;json&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-json &quot;&gt;&lt;code class=&quot;language-json&quot; data-lang=&quot;json&quot;&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;greeting&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hello, John Doe!&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h4 id=&quot;invalid-test&quot;&gt;Invalid test&lt;&#x2F;h4&gt;
+&lt;p&gt;If we try a query without the &lt;code&gt;name&lt;&#x2F;code&gt; parameter &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;greet&quot;&gt;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;greet&lt;&#x2F;a&gt;, we instead see the following error message:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;Failed to deserialize query string: missing field `name`
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;We see that the request is not process because the required parameters are not present and get a default error. We will later see how we can customize this behavior (to get a JSON error far example)&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;optional-field&quot;&gt;Optional field&lt;&#x2F;h4&gt;
+&lt;p&gt;It would also have been possible to make the name optional by using the :&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rs&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rs &quot;&gt;&lt;code class=&quot;language-rs&quot; data-lang=&quot;rs&quot;&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Deserialize)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;struct &lt;&#x2F;span&gt;&lt;span&gt;GreetQuery {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span&gt;: Option&amp;lt;String&amp;gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;In this way, it would have been feasible to display a default name, for example :&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rs&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rs &quot;&gt;&lt;code class=&quot;language-rs&quot; data-lang=&quot;rs&quot;&gt;&lt;span&gt;async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;greet&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;greet_query&lt;&#x2F;span&gt;&lt;span&gt;: Query&amp;lt;GreetQuery&amp;gt;) -&amp;gt; Json&amp;lt;GreetResponse&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;    Json(GreetResponse {
+&lt;&#x2F;span&gt;&lt;span&gt;        greeting: format!(
+&lt;&#x2F;span&gt;&lt;span&gt;            &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hello, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;{}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;!&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;            greet_query
+&lt;&#x2F;span&gt;&lt;span&gt;                .name
+&lt;&#x2F;span&gt;&lt;span&gt;                .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;as_ref&lt;&#x2F;span&gt;&lt;span&gt;()
+&lt;&#x2F;span&gt;&lt;span&gt;                .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;map&lt;&#x2F;span&gt;&lt;span&gt;(String::as_str)
+&lt;&#x2F;span&gt;&lt;span&gt;                .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap_or&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Anonymous&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span&gt;        ),
+&lt;&#x2F;span&gt;&lt;span&gt;    })
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Instead of the error when requesting &lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;greet&quot;&gt;http:&#x2F;&#x2F;127.0.0.1:3000&#x2F;greet&lt;&#x2F;a&gt; we would then have had the following response:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;json&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-json &quot;&gt;&lt;code class=&quot;language-json&quot; data-lang=&quot;json&quot;&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;greeting&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hello, Anonymous!&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;a rel=&quot;noopener nofollow noreferrer&quot; target=&quot;_blank&quot; href=&quot;https:&#x2F;&#x2F;github.com&#x2F;d34db4b3&#x2F;rest-api-tutorial&#x2F;tree&#x2F;snapshots&#x2F;greetings&quot;&gt;Source code snapshot&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Congratulations, this is the end of the introduction, the next part is being written.&lt;&#x2F;p&gt;
+&lt;&#x2F;blockquote&gt;
+&lt;!-- 
+Now that we are done with the introduction, let&#x27;s have a deeper look at error handling in the [next part](@&#x2F;posts&#x2F;rust-rest-api-ii.md). --&gt;</content>
+        
+    </entry>
+</feed>
